@@ -55,6 +55,9 @@ namespace lgfx
 
       // max 20MHz , 16MHz , 13.3MHz , 11.43MHz , 10MHz , 8.9MHz  and more ...
       uint32_t freq_write = 16000000;
+
+      // RD strobe rate for reading. 0 = as fast as the CPU can toggle RD.
+      uint32_t freq_read = 0;
       union
       {
         int8_t pin_ctrl[3] = { -1, -1, -1 };
@@ -134,6 +137,7 @@ namespace lgfx
     void _read_bytes(uint8_t* dst, uint32_t length);
 
     uint32_t _clkdiv_write;
+    uint32_t _read_wait_cycles = 0; // CPU cycles per RD half period (0 = no wait)
     volatile void *_dev;
     lldesc_t _dmadesc;
 

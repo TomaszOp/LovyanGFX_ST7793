@@ -91,6 +91,10 @@ namespace lgfx
                   |        0 << I2S_CLKM_DIV_B_S
                   | _div_num << I2S_CLKM_DIV_NUM_S
                   ;
+
+    _read_wait_cycles = _cfg.freq_read
+                      ? (ets_get_cpu_frequency() * 1000000u) / (2 * _cfg.freq_read)
+                      : 0;
   }
 
   bool Bus_Parallel8::init(void)
@@ -539,18 +543,45 @@ namespace lgfx
     _cache_index = idx;
   }
 
+  static inline void _wait_cycles(uint32_t cycles)
+  {
+    uint32_t start;
+    uint32_t now;
+    __asm__ __volatile__("rsr %0, ccount" : "=a"(start));
+    do
+    {
+      __asm__ __volatile__("rsr %0, ccount" : "=a"(now));
+    } while (now - start < cycles);
+  }
+
   void Bus_Parallel8::beginRead(void)
   {
     if (_cache_index) { _cache_index = _flush(_cache_index, true); }
     _wait();
 
     LGFX_GPIO_MATRIX_OUT(_cfg.pin_rs, 0x100, 0, 0);
+    // Release the data lines so the panel can drive them.
+    for (size_t i = 0; i < 8; ++i)
+    {
+      if (_cfg.pin_data[i] >= 0) { gpio_set_direction((gpio_num_t)_cfg.pin_data[i], GPIO_MODE_INPUT); }
+    }
     gpio_lo(_cfg.pin_rd);
   }
 
   void Bus_Parallel8::endRead(void)
   {
     gpio_hi(_cfg.pin_rd);
+
+    // gpio_set_direction() reconnects an output pin to plain GPIO (SIG_GPIO_OUT_IDX),
+    // so the data lines must be routed back to the I2S outputs afterwards.
+    auto data_idx = (_cfg.i2s_port == I2S_NUM_0) ? I2S0O_DATA_OUT8_IDX : I2S1O_DATA_OUT8_IDX;
+    for (size_t i = 0; i < 8; ++i)
+    {
+      int32_t pin = _cfg.pin_data[i];
+      if (pin < 0) { continue; }
+      gpio_set_direction((gpio_num_t)pin, GPIO_MODE_INPUT_OUTPUT);
+      LGFX_GPIO_MATRIX_OUT(pin, data_idx + i, 0, 0);
+    }
 
     auto idx_base = (_cfg.i2s_port == I2S_NUM_0) ? I2S0O_DATA_OUT16_IDX : I2S1O_DATA_OUT16_IDX;
     LGFX_GPIO_MATRIX_OUT(_cfg.pin_rs, idx_base, 0, 0);
@@ -589,12 +620,15 @@ namespace lgfx
     auto reg_rd_h = get_gpio_hi_reg(_cfg.pin_rd);
     auto reg_rd_l = get_gpio_lo_reg(_cfg.pin_rd);
     uint32_t mask_rd = 1ul << (_cfg.pin_rd & 31);
+    uint32_t wait = _read_wait_cycles;
     uint_fast8_t val;
     do
     {
+      if (wait) { _wait_cycles(wait); } // RD low time / read access time
       in32[1] = GPIO.in1.val;
       in32[0] = GPIO.in;
       *reg_rd_h = mask_rd;
+      if (wait) { _wait_cycles(wait); } // RD high time
       val =              (1 & (in[(idx >>  0) & 7] >> ((mask >>  0) & 7)));
       val = (val << 1) + (1 & (in[(idx >>  3) & 7] >> ((mask >>  3) & 7)));
       val = (val << 1) + (1 & (in[(idx >>  6) & 7] >> ((mask >>  6) & 7)));

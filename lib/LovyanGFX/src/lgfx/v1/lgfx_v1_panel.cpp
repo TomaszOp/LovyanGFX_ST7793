@@ -29,6 +29,7 @@
 #include "panel/Panel_SSD1677.inl"
 #include "panel/Panel_SSD1963.inl"
 #include "panel/Panel_ST77916.inl"
+#include "panel/Panel_ST7793.inl"
 #include "panel/Panel_SharpLCD.inl"
 #include "panel/Panel_TM1680.inl"
 

@@ -73,7 +73,8 @@ namespace lgfx
 
     _init_pin();
 
-    LGFX_GPIO_PAD_SELECT(_cfg.pin_rd);
+    // pin_rd may be -1 (RD tied to VCC, write-only bus).
+    if (_cfg.pin_rd >= 0) { LGFX_GPIO_PAD_SELECT(_cfg.pin_rd); }
     LGFX_GPIO_PAD_SELECT(_cfg.pin_wr);
     LGFX_GPIO_PAD_SELECT(_cfg.pin_rs);
 
@@ -81,7 +82,7 @@ namespace lgfx
     gpio_hi(_cfg.pin_wr);
     gpio_hi(_cfg.pin_rs);
 
-    gpio_set_direction((gpio_num_t)_cfg.pin_rd, GPIO_MODE_OUTPUT);
+    if (_cfg.pin_rd >= 0) { gpio_set_direction((gpio_num_t)_cfg.pin_rd, GPIO_MODE_OUTPUT); }
     gpio_set_direction((gpio_num_t)_cfg.pin_wr, GPIO_MODE_OUTPUT);
     gpio_set_direction((gpio_num_t)_cfg.pin_rs, GPIO_MODE_OUTPUT);
 
