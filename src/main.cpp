@@ -1,5 +1,21 @@
-#include <Arduino.h>
 #include <sdkconfig.h>
+
+#if defined (ARDUINO)
+  #include <Arduino.h>
+  #define LOG(...)      Serial.printf(__VA_ARGS__)
+  #define FREE_HEAP()   ESP.getFreeHeap()
+  #define YIELD_CPU()   do {} while (0)
+#else
+  // Pure ESP-IDF: console UART runs at 115200 from boot.
+  #include <cstdio>
+  #include <esp_heap_caps.h>
+  #include <freertos/FreeRTOS.h>
+  #include <freertos/task.h>
+  #define LOG(...)      printf(__VA_ARGS__)
+  #define FREE_HEAP()   heap_caps_get_free_size(MALLOC_CAP_8BIT)
+  // Lets the IDLE task run, so the task watchdog does not complain during the animation.
+  #define YIELD_CPU()   vTaskDelay(1)
+#endif
 
 #if defined (CONFIG_IDF_TARGET_ESP32C3)
   #include <lgfx_user/LGFX_ESP32C3_ST7793.hpp>
@@ -9,6 +25,11 @@
   #include <lgfx_user/LGFX_ESP32_ST7793.hpp>
 #else
   #error "No ST7793 LGFX configuration for this target"
+#endif
+
+#if !defined (ARDUINO)
+  using lgfx::delay;
+  using lgfx::millis;
 #endif
 
 // 1 = run the LCD read tests (ID, register readback, readPixel) at startup.
@@ -39,7 +60,7 @@ static void testReadID(void)
 
   if (!readable())
   {
-    Serial.println("ID: read disabled (readable = false)");
+    LOG("ID: read disabled (readable = false)\n");
     lcd.setTextColor(TFT_YELLOW, TFT_BLACK);
     lcd.println("ID: read disabled");
     delay(2000);
@@ -50,9 +71,9 @@ static void testReadID(void)
   uint16_t id  = panel()->readRegister(0x0000);
   bool ok = (id == 0x7793);
 
-  Serial.printf("ID: 0x%04X %s (raw bytes: %02X %02X %02X %02X)\n", id,
-                ok ? "OK" : "- read failed, shield buffers may be one-way",
-                raw & 0xFF, (raw >> 8) & 0xFF, (raw >> 16) & 0xFF, raw >> 24);
+  LOG("ID: 0x%04X %s (raw bytes: %02X %02X %02X %02X)\n", id,
+      ok ? "OK" : "- read failed, shield buffers may be one-way",
+      (unsigned)(raw & 0xFF), (unsigned)((raw >> 8) & 0xFF), (unsigned)((raw >> 16) & 0xFF), (unsigned)(raw >> 24));
 
   lcd.setTextColor(ok ? TFT_GREEN : TFT_RED, TFT_BLACK);
   lcd.printf("ID: 0x%04X %s\n", id, ok ? "OK" : "FAIL");
@@ -91,10 +112,10 @@ static void testRegisters(void)
     if (got != t.value)
     {
       ++errors;
-      Serial.printf("  R%03Xh %s 0x%04X read 0x%04X\n", t.reg, t.write ? "wrote" : "expect", t.value, got);
+      LOG("  R%03Xh %s 0x%04X read 0x%04X\n", t.reg, t.write ? "wrote" : "expect", t.value, got);
     }
   }
-  Serial.printf("Registers: %s\n", errors ? "FAIL" : "OK");
+  LOG("Registers: %s\n", errors ? "FAIL" : "OK");
   lcd.startWrite();
   panel()->writeRegister(0x0404, 0x0000);
   lcd.endWrite();
@@ -130,11 +151,11 @@ static void testReadPixel(void)
     if (got != colors[i])
     {
       ++errors;
-      Serial.printf("  (%3d,%3d) wrote 0x%04X read 0x%04X\n", x, y, colors[i], got);
+      LOG("  (%3d,%3d) wrote 0x%04X read 0x%04X\n", x, y, colors[i], got);
     }
   }
 
-  Serial.printf("readPixel: %s (%d/%d)\n", errors ? "FAIL" : "OK", n - errors, n);
+  LOG("readPixel: %s (%d/%d)\n", errors ? "FAIL" : "OK", n - errors, n);
   lcd.setTextSize(2);
   lcd.setCursor(10, 80);
   lcd.setTextColor(errors ? TFT_RED : TFT_GREEN, TFT_BLACK);
@@ -193,11 +214,11 @@ static void bouncingBall(uint32_t duration_ms)
   }
   if (!band_h)
   {
-    Serial.println("bouncingBall: sprite alloc failed");
+    LOG("bouncingBall: sprite alloc failed\n");
     return;
   }
-  Serial.printf("bouncingBall: %dx%d, band %dx%d (%u B), free heap %u B\n",
-                w, h, w, band_h, (unsigned)(w * band_h * 2), (unsigned)ESP.getFreeHeap());
+  LOG("bouncingBall: %dx%d, band %dx%d (%u B), free heap %u B\n",
+      w, h, w, band_h, (unsigned)(w * band_h * 2), (unsigned)FREE_HEAP());
 
   int x = w / 2, y = h / 2; // ball center
   int vx = 3, vy = 2;
@@ -261,7 +282,9 @@ static void bouncingBall(uint32_t duration_ms)
       fps = frames * 1000.0f / (now - fps_time);
       frames = 0;
       fps_time = now;
-      Serial.printf("FPS: %.1f, %.2f MB/s\n", fps, fps * w * h * 2 / 1000000.0f);
+      LOG("FPS: %.1f, %.2f MB/s\n", fps, fps * w * h * 2 / 1000000.0f);
+      YIELD_CPU(); // once per second, outside the measured interval
+      fps_time = millis();
     }
   }
   lcd.endWrite();
@@ -271,9 +294,11 @@ static void bouncingBall(uint32_t duration_ms)
 
 void setup()
 {
+#if defined (ARDUINO)
   Serial.begin(115200);
+#endif
   lcd.init();
-  Serial.println("LCD init done");
+  LOG("LCD init done\n");
 
 #if ST7793_READ_TEST
   // A failed read does not stop the drawing tests.
@@ -301,3 +326,11 @@ void loop()
   bouncingBall(10000); // in the last rotation
   lcd.setRotation(0);
 }
+
+#if !defined (ARDUINO)
+extern "C" void app_main(void)
+{
+  setup();
+  for (;;) { loop(); }
+}
+#endif

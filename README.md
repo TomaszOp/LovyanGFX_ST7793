@@ -31,6 +31,10 @@ This PlatformIO project adds support for the **Sitronix ST7793** controller to a
   (locally pioarduino 55.03.39 / Arduino 3.3.9),
 - Arduino **2.x** (official platform `espressif32@6.13.0`, Arduino 2.0.17 / ESP-IDF 4.4) – envs `*-arduino2`.
 
+**ESP-IDF framework:**
+- pure **ESP-IDF 5.5.5** (`framework = espidf`, package `framework-espidf` 3.50505 from pioarduino),
+  platform pioarduino 55.03.39 (`platform = espressif32`) – envs `*-idf`.
+
 ### Test status
 
 | Chip | Arduino 3.x | Arduino 2.x | Hardware |
@@ -106,6 +110,7 @@ Envs in `platformio.ini`:
 |---|---|
 | `esp32-c3-devkitm-1` (default), `esp32-s3-devkitc-1`, `esp32dev` | `espressif32` (pioarduino, Arduino 3.x) |
 | `esp32-c3-devkitm-1-arduino2`, `esp32-s3-devkitc-1-arduino2`, `esp32dev-arduino2` | `espressif32@6.13.0` (Arduino 2.x) |
+| `esp32-c3-devkitm-1-idf`, `esp32-s3-devkitc-1-idf`, `esp32dev-idf` | `espressif32` (pioarduino), `framework = espidf` (pure ESP-IDF 5.5; not built yet) |
 
 ```bash
 pio run -e esp32dev
@@ -201,7 +206,14 @@ tables above, following the `lgfx_user` directory convention. Each file has a
     (`gpio_matrix_out(pin, I2Sx_DATA_OUT8 + i)`). Without this, after the first read all writes
     reached the controller as `0x00` and every readPixel returned the ID `0x7793`;
   - **new field `config_t::freq_read`** (default 0 = previous behavior): counting CPU cycles
-    (`ccount`) stretches the RD low/high phases to meet the datasheet timing.
+    (`ccount`) stretches the RD low/high phases to meet the datasheet timing;
+  - **CPU frequency for `freq_read` with an explicit header, selected by ESP-IDF version**
+    (`#include <esp_idf_version.h>`): for ESP-IDF ≥ 5.0 `#include <esp_rom_sys.h>` and
+    `esp_rom_get_cpu_ticks_per_us()`, otherwise (ESP-IDF 4.4 / Arduino 2.x) `#include <esp32/rom/ets_sys.h>`
+    and `ets_get_cpu_frequency()`. Originally `ets_get_cpu_frequency()` was used without an include:
+    under Arduino the header came in indirectly, under pure ESP-IDF it did not, so the build failed.
+    `esp_rom_get_cpu_ticks_per_us()` is declared in ESP-IDF 5.x (checked in 5.5), but not in the
+    ESP-IDF 4.4 headers of Arduino 2.0.17, hence the fallback.
 
 ### Modified project files
 
@@ -254,6 +266,10 @@ Projekt PlatformIO dodaje obsługę sterownika **Sitronix ST7793** do lokalnej k
   (lokalnie pioarduino 55.03.39 / Arduino 3.3.9),
 - Arduino **2.x** (oficjalna platforma `espressif32@6.13.0`, Arduino 2.0.17 / ESP-IDF 4.4) – env `*-arduino2`.
 
+**Framework ESP-IDF:**
+- czyste **ESP-IDF 5.5.5** (`framework = espidf`, pakiet `framework-espidf` 3.50505 z pioarduino),
+  platforma pioarduino 55.03.39 (`platform = espressif32`) – env `*-idf`.
+
 ### Stan przetestowania
 
 | Układ | Arduino 3.x | Arduino 2.x | Sprzęt |
@@ -267,7 +283,7 @@ Projekt PlatformIO dodaje obsługę sterownika **Sitronix ST7793** do lokalnej k
 Konfiguracje są w `lib/LovyanGFX/src/lgfx_user/LGFX_ESP32*_ST7793.hpp`. `src/main.cpp` wybiera
 właściwy plik automatycznie (`CONFIG_IDF_TARGET_*`).
 
-**ESP32 (esp32dev)** – magistrala przez I2S; pominięte GPIO 6–11 (flash), 34–39 (tylko wejścia),
+**ESP32 (esp32dev)** – magistrala przVez I2S; pominięte GPIO 6–11 (flash), 34–39 (tylko wejścia),
 0/2/5/12/15 (strap), 1/3 (UART0), 16/17 (PSRAM w WROVER).
 
 | Shield | GPIO |
@@ -329,6 +345,7 @@ Env w `platformio.ini`:
 |---|---|
 | `esp32-c3-devkitm-1` (domyślny), `esp32-s3-devkitc-1`, `esp32dev` | `espressif32` (pioarduino, Arduino 3.x) |
 | `esp32-c3-devkitm-1-arduino2`, `esp32-s3-devkitc-1-arduino2`, `esp32dev-arduino2` | `espressif32@6.13.0` (Arduino 2.x) |
+| `esp32-c3-devkitm-1-idf`, `esp32-s3-devkitc-1-idf`, `esp32dev-idf` | `espressif32` (pioarduino), `framework = espidf` (czyste ESP-IDF 5.5; jeszcze nie budowane) |
 
 ```bash
 pio run -e esp32dev
@@ -424,7 +441,14 @@ z czytelnym `#error`, a w komentarzu tabelę połączeń.
     sygnału I2S (`gpio_matrix_out(pin, I2Sx_DATA_OUT8 + i)`). Bez tego po pierwszym odczycie
     wszystkie zapisy docierały do sterownika jako `0x00` i każdy readPixel zwracał ID `0x7793`;
   - **nowe pole `config_t::freq_read`** (domyślnie 0 = dotychczasowe zachowanie): odliczanie cykli
-    CPU (`ccount`) wydłuża fazy RD low/high, żeby spełnić czasy z datasheetu.
+    CPU (`ccount`) wydłuża fazy RD low/high, żeby spełnić czasy z datasheetu;
+  - **częstotliwość CPU dla `freq_read` z jawnym nagłówkiem, wybieranym według wersji ESP-IDF**
+    (`#include <esp_idf_version.h>`): dla ESP-IDF ≥ 5.0 `#include <esp_rom_sys.h>` i
+    `esp_rom_get_cpu_ticks_per_us()`, w przeciwnym razie (ESP-IDF 4.4 / Arduino 2.x)
+    `#include <esp32/rom/ets_sys.h>` i `ets_get_cpu_frequency()`. Pierwotnie `ets_get_cpu_frequency()`
+    było użyte bez include: pod Arduino nagłówek przychodził pośrednio, pod czystym ESP-IDF nie, więc
+    build się nie udawał. `esp_rom_get_cpu_ticks_per_us()` jest zadeklarowane w ESP-IDF 5.x
+    (sprawdzone w 5.5), ale nie w nagłówkach ESP-IDF 4.4 z Arduino 2.0.17, stąd wariant zapasowy.
 
 ### Zmienione pliki projektu
 

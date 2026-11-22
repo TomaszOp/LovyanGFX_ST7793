@@ -28,6 +28,14 @@ Contributors:
 #include <soc/dport_reg.h>
 #include <soc/i2s_struct.h>
 #include <rom/gpio.h>
+#include <esp_idf_version.h>
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+ #include <esp_rom_sys.h>
+ #define LGFX_CPU_FREQ_MHZ() esp_rom_get_cpu_ticks_per_us()
+#else
+ #include <esp32/rom/ets_sys.h> // ESP-IDF 4.4 has no esp_rom_get_cpu_ticks_per_us()
+ #define LGFX_CPU_FREQ_MHZ() ets_get_cpu_frequency()
+#endif
 
 #if defined (ESP_IDF_VERSION_VAL) && (ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0))
  #define LGFX_GPIO_PAD_SELECT(pin)               rom_gpio_pad_select_gpio((gpio_num_t)(pin))
@@ -93,7 +101,7 @@ namespace lgfx
                   ;
 
     _read_wait_cycles = _cfg.freq_read
-                      ? (ets_get_cpu_frequency() * 1000000u) / (2 * _cfg.freq_read)
+                      ? (LGFX_CPU_FREQ_MHZ() * 1000000u) / (2 * _cfg.freq_read)
                       : 0;
   }
 
