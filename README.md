@@ -110,7 +110,7 @@ Envs in `platformio.ini`:
 |---|---|
 | `esp32-c3-devkitm-1` (default), `esp32-s3-devkitc-1`, `esp32dev` | `espressif32` (pioarduino, Arduino 3.x) |
 | `esp32-c3-devkitm-1-arduino2`, `esp32-s3-devkitc-1-arduino2`, `esp32dev-arduino2` | `espressif32@6.13.0` (Arduino 2.x) |
-| `esp32-c3-devkitm-1-idf`, `esp32-s3-devkitc-1-idf`, `esp32dev-idf` | `espressif32` (pioarduino), `framework = espidf` (pure ESP-IDF 5.5; not built yet) |
+| `esp32-c3-devkitm-1-idf`, `esp32-s3-devkitc-1-idf`, `esp32dev-idf` | `espressif32` (pioarduino), `framework = espidf` (pure ESP-IDF 5.5; builds OK, not tested on hardware) |
 
 ```bash
 pio run -e esp32dev
@@ -345,7 +345,7 @@ Env w `platformio.ini`:
 |---|---|
 | `esp32-c3-devkitm-1` (domyślny), `esp32-s3-devkitc-1`, `esp32dev` | `espressif32` (pioarduino, Arduino 3.x) |
 | `esp32-c3-devkitm-1-arduino2`, `esp32-s3-devkitc-1-arduino2`, `esp32dev-arduino2` | `espressif32@6.13.0` (Arduino 2.x) |
-| `esp32-c3-devkitm-1-idf`, `esp32-s3-devkitc-1-idf`, `esp32dev-idf` | `espressif32` (pioarduino), `framework = espidf` (czyste ESP-IDF 5.5; jeszcze nie budowane) |
+| `esp32-c3-devkitm-1-idf`, `esp32-s3-devkitc-1-idf`, `esp32dev-idf` | `espressif32` (pioarduino), `framework = espidf` (czyste ESP-IDF 5.5; kompilacja OK, nie testowane na sprzęcie) |
 
 ```bash
 pio run -e esp32dev
